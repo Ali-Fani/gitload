@@ -135,7 +135,8 @@ jobs:
           mkdir -p release-files commit-files downloads
       
           LIMIT=$((95 * 1024 * 1024))
-          WS="$GITHUB_WORKSPACE"
+      
+          BASE_WS="$GITHUB_WORKSPACE"
       
           for file in /tmp/dl/*; do
             [ -f "$file" ] || continue
@@ -143,12 +144,15 @@ jobs:
             name=$(basename "$file")
             size=$(stat -c%s "$file")
       
-            stem=$(echo "$name" | sed 's/\.[^.]*$//' | tr ' @' '__')
+            stem="${name%.*}"
+            safe_stem=$(printf '%s' "$stem" | tr -c 'a-zA-Z0-9._-' '_')
       
-            target="$WS/downloads/$stem"
+            target="$BASE_WS/downloads/$safe_stem"
             mkdir -p "$target"
       
-            # small file → direct move
+            # ─────────────────────────────
+            # Small file → direct move
+            # ─────────────────────────────
             if [ "$size" -le "$LIMIT" ]; then
               mv "$file" "$target/$name"
               continue
@@ -156,20 +160,30 @@ jobs:
       
             echo "⚡ Splitting $name with 7z"
       
-            safe_id=$(echo "$name" | sha1sum | cut -c1-12)
-            outdir="$WS/commit-files/$safe_id"
-            mkdir -p "$outdir"
+            # ─────────────────────────────
+            # Unique isolated workspace per file
+            # ─────────────────────────────
+            workdir="$(mktemp -d "$BASE_WS/commit-files/${safe_stem}.XXXXXX")"
       
-            rm -f "$outdir"/*.zip "$outdir"/*.z* 2>/dev/null || true
+            # ensure clean state (paranoia-safe for CI retries)
+            rm -rf "$workdir"/*
+            mkdir -p "$workdir"
       
             (
               cd /tmp/dl || exit 1
       
+              # IMPORTANT:
+              # -aoa = overwrite
+              # -y   = assume yes
+              # no shared output paths → no collisions possible
               7z a -tzip -v95m -y -aoa \
-                "$outdir/archive.zip" \
+                "$workdir/${safe_stem}.zip" \
                 "$name"
             )
       
+            echo "✅ Created split archive in $workdir"
+      
+            # optional cleanup of original temp file
             rm -f "$file"
           done
 
