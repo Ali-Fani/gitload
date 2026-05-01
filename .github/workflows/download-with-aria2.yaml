@@ -247,7 +247,8 @@ jobs:
             if aria2c --split=4 --max-connection-per-server=4 \
                       --file-allocation=none \
                       --dir=/tmp/release-dl \
-                      --out="$(basename "$URL")" \
+                      --content-disposition=true \
+                      --auto-file-renaming=false \
                       "$URL"; then
               OK_COUNT=$((OK_COUNT + 1))
             else
@@ -262,7 +263,8 @@ jobs:
             if aria2c --split=4 --max-connection-per-server=4 \
                       --file-allocation=none \
                       --dir=/tmp/commit-dl \
-                      --out="$(basename "$URL")" \
+                      --content-disposition=true \
+                      --auto-file-renaming=false \
                       "$URL"; then
               OK_COUNT=$((OK_COUNT + 1))
             else
@@ -277,7 +279,8 @@ jobs:
             if aria2c --split=4 --max-connection-per-server=4 \
                       --file-allocation=none \
                       --dir=/tmp/file-dl \
-                      --out="$(basename "$URL")" \
+                      --content-disposition=true \
+                      --auto-file-renaming=false \
                       "$URL"; then
               OK_COUNT=$((OK_COUNT + 1))
             else
