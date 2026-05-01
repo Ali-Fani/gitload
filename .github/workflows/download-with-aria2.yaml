@@ -156,8 +156,19 @@ jobs:
             echo "⚡ Splitting $name with 7z"
 
             (
-              cd /tmp/dl
-              7z a -tzip -v95m "$target/$stem.zip" "$name" >/dev/null
+              cd /tmp/commit-dl || exit 1
+            
+              safe_id=$(echo "$name" | sha1sum | cut -c1-12)
+              target="$WS/commit-files/$safe_id"
+              mkdir -p "$target"
+            
+              rm -f "$target"/*.zip "$target"/*.z* 2>/dev/null || true
+            
+              echo "⚡ Splitting $name → $target"
+            
+              7z a -tzip -v95m -y -aoa \
+                "$target/archive.zip" \
+                "$name"
             )
 
             rm -f "$file"
