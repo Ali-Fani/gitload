@@ -1,0 +1,14 @@
+original_file = 200MB.zip
+original_size = 209715200 bytes (200 MB)
+split_method  = zip multi-volume, store (no compression)
+volume_size   = 95 MB
+total_volumes = 4
+
+HOW TO EXTRACT
+==============
+Windows : keep all 200MB.z* files in the same folder, then open
+          200MB.zip with 7-Zip, WinRAR, or PeaZip and Extract.
+          (Windows Explorer cannot handle split zips — use 7-Zip.)
+
+Linux   : zip -s 0 200MB.zip --out joined.zip && unzip joined.zip
+macOS   : same as Linux (install zip via Homebrew if needed).
