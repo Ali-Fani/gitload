@@ -1,0 +1,14 @@
+original_file = gAAAAABp9OiFV3ZXU5KABVTZ7LAKXM9KKFG-hEe4QK9Hcin-4wi8G-pV11opH1nDe_KEYRjSl-lSKjyaaRAP__ya67gKBZdKloQccd41n-CAptyX5cwpwSFS7lAT6fyuHPWqQfR5SQeW
+original_size = 1048576000 bytes (1000 MB)
+split_method  = zip multi-volume, store (no compression)
+volume_size   = 95 MB
+total_volumes = 12
+
+HOW TO EXTRACT
+==============
+Windows : keep all gAAAAABp9OiFV3ZXU5KABVTZ7LAKXM9KKFG-hEe4QK9Hcin-4wi8G-pV11opH1nDe_KEYRjSl-lSKjyaaRAP__ya67gKBZdKloQccd41n-CAptyX5cwpwSFS7lAT6fyuHPWqQfR5SQeW.z* files in the same folder, then open
+          gAAAAABp9OiFV3ZXU5KABVTZ7LAKXM9KKFG-hEe4QK9Hcin-4wi8G-pV11opH1nDe_KEYRjSl-lSKjyaaRAP__ya67gKBZdKloQccd41n-CAptyX5cwpwSFS7lAT6fyuHPWqQfR5SQeW.zip with 7-Zip, WinRAR, or PeaZip and Extract.
+          (Windows Explorer cannot handle split zips — use 7-Zip.)
+
+Linux   : zip -s 0 gAAAAABp9OiFV3ZXU5KABVTZ7LAKXM9KKFG-hEe4QK9Hcin-4wi8G-pV11opH1nDe_KEYRjSl-lSKjyaaRAP__ya67gKBZdKloQccd41n-CAptyX5cwpwSFS7lAT6fyuHPWqQfR5SQeW.zip --out joined.zip && unzip joined.zip
+macOS   : same as Linux (install zip via Homebrew if needed).
