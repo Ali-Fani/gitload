@@ -67,7 +67,7 @@ jobs:
       - name: Install deps (minimal)
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y aria2 p7zip-full
+          sudo apt-get install -y aria2
 
       - name: Cache pip
         uses: actions/cache@v4
@@ -154,25 +154,17 @@ jobs:
               continue
             fi
       
-            echo "⚡ Splitting $name with 7z"
+            echo "⚡ Splitting $name with zip"
       
             workdir="$BASE_WS/commit-files/${safe_stem}_split"
             rm -rf "$workdir"
             mkdir -p "$workdir"
       
-            (
-              cd /tmp/dl || exit 1
-      
-              7z a -tzip -v95m -y -aoa \
-                -w"$workdir" \
-                "$workdir/${safe_stem}.zip" \
-                "$name"
-            )
+            zip -s 95m "$workdir/${safe_stem}.zip" "$file"
       
             echo "✅ Created split archive in $workdir"
             rm -f "$file"
           done
-
       # ─────────────────────────────────────────────
       # FAST COMMIT
       # ─────────────────────────────────────────────
