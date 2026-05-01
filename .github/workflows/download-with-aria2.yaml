@@ -135,7 +135,6 @@ jobs:
           mkdir -p release-files commit-files downloads
       
           LIMIT=$((95 * 1024 * 1024))
-      
           BASE_WS="$GITHUB_WORKSPACE"
       
           for file in /tmp/dl/*; do
@@ -150,9 +149,6 @@ jobs:
             target="$BASE_WS/downloads/$safe_stem"
             mkdir -p "$target"
       
-            # ─────────────────────────────
-            # Small file → direct move
-            # ─────────────────────────────
             if [ "$size" -le "$LIMIT" ]; then
               mv "$file" "$target/$name"
               continue
@@ -160,30 +156,21 @@ jobs:
       
             echo "⚡ Splitting $name with 7z"
       
-            # ─────────────────────────────
-            # Unique isolated workspace per file
-            # ─────────────────────────────
-            workdir="$(mktemp -d "$BASE_WS/commit-files/${safe_stem}.XXXXXX")"
-      
-            # ensure clean state (paranoia-safe for CI retries)
-            rm -rf "$workdir"/*
+            # Guarantee a clean, isolated workspace for every file
+            workdir="$BASE_WS/commit-files/${safe_stem}_split"
+            rm -rf "$workdir"
             mkdir -p "$workdir"
       
             (
               cd /tmp/dl || exit 1
       
-              # IMPORTANT:
-              # -aoa = overwrite
-              # -y   = assume yes
-              # no shared output paths → no collisions possible
               7z a -tzip -v95m -y -aoa \
+                -w"$workdir" \
                 "$workdir/${safe_stem}.zip" \
                 "$name"
             )
       
             echo "✅ Created split archive in $workdir"
-      
-            # optional cleanup of original temp file
             rm -f "$file"
           done
 
