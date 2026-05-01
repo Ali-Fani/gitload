@@ -156,7 +156,6 @@ jobs:
       
             echo "⚡ Splitting $name with 7z"
       
-            # Guarantee a clean, isolated workspace for every file
             workdir="$BASE_WS/commit-files/${safe_stem}_split"
             rm -rf "$workdir"
             mkdir -p "$workdir"
