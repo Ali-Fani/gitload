@@ -131,46 +131,45 @@ jobs:
       - name: Process files
         run: |
           set -euo pipefail
-
+      
           mkdir -p release-files commit-files downloads
-
+      
           LIMIT=$((95 * 1024 * 1024))
-
+          WS="$GITHUB_WORKSPACE"
+      
           for file in /tmp/dl/*; do
             [ -f "$file" ] || continue
-
+      
             name=$(basename "$file")
             size=$(stat -c%s "$file")
-
-            # sanitize filename base
+      
             stem=$(echo "$name" | sed 's/\.[^.]*$//' | tr ' @' '__')
-
-            target="downloads/$stem"
+      
+            target="$WS/downloads/$stem"
             mkdir -p "$target"
-
+      
+            # small file → direct move
             if [ "$size" -le "$LIMIT" ]; then
               mv "$file" "$target/$name"
               continue
             fi
-
+      
             echo "⚡ Splitting $name with 7z"
-
+      
+            safe_id=$(echo "$name" | sha1sum | cut -c1-12)
+            outdir="$WS/commit-files/$safe_id"
+            mkdir -p "$outdir"
+      
+            rm -f "$outdir"/*.zip "$outdir"/*.z* 2>/dev/null || true
+      
             (
-              cd /tmp/commit-dl || exit 1
-            
-              safe_id=$(echo "$name" | sha1sum | cut -c1-12)
-              target="$WS/commit-files/$safe_id"
-              mkdir -p "$target"
-            
-              rm -f "$target"/*.zip "$target"/*.z* 2>/dev/null || true
-            
-              echo "⚡ Splitting $name → $target"
-            
+              cd /tmp/dl || exit 1
+      
               7z a -tzip -v95m -y -aoa \
-                "$target/archive.zip" \
+                "$outdir/archive.zip" \
                 "$name"
             )
-
+      
             rm -f "$file"
           done
 
