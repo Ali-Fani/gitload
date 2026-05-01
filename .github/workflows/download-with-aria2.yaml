@@ -1,0 +1,212 @@
+name: Download + YouTube → Release
+
+on:
+  push:
+    branches:
+      - "**"
+
+jobs:
+  release-upload:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout (for commit message)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y aria2 zip ffmpeg python3-pip git-lfs
+          pip install -U yt-dlp
+          git lfs install
+
+      - name: Extract commands from commit
+        id: extract
+        run: |
+          MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $MSG"
+
+          MODE="normal"
+          URLS=""
+          YT_URLS=""
+          YT_AUDIO_URLS=""
+          COMMIT_URLS=""
+
+          if echo "$MSG" | grep -qP 'download-zip:'; then
+            MODE="zip"
+            URLS=$(echo "$MSG" | grep -oP 'download-zip:\s*\K.*')
+          elif echo "$MSG" | grep -qP 'download:'; then
+            URLS=$(echo "$MSG" | grep -oP 'download:\s*\K.*')
+          fi
+
+          if echo "$MSG" | grep -qP 'youtube:'; then
+            YT_URLS=$(echo "$MSG" | grep -oP 'youtube:\s*\K.*')
+          fi
+
+          if echo "$MSG" | grep -qP 'youtube-audio:'; then
+            YT_AUDIO_URLS=$(echo "$MSG" | grep -oP 'youtube-audio:\s*\K.*')
+          fi
+
+          if echo "$MSG" | grep -qP 'downloadc:'; then
+            COMMIT_URLS=$(echo "$MSG" | grep -oP 'downloadc:\s*\K.*')
+          fi
+
+          if [ -z "$URLS" ] && [ -z "$YT_URLS" ] && [ -z "$YT_AUDIO_URLS" ] && [ -z "$COMMIT_URLS" ]; then
+            echo "❌ No valid command found"
+            exit 1
+          fi
+
+          echo "mode=$MODE" >> $GITHUB_OUTPUT
+          echo "urls=$URLS" >> $GITHUB_OUTPUT
+          echo "yt_urls=$YT_URLS" >> $GITHUB_OUTPUT
+          echo "yt_audio_urls=$YT_AUDIO_URLS" >> $GITHUB_OUTPUT
+          echo "commit_urls=$COMMIT_URLS" >> $GITHUB_OUTPUT
+
+      - name: Download everything to /tmp
+        run: |
+          mkdir -p /tmp/downloads
+          mkdir -p /tmp/lfs-downloads
+
+          ########################################
+          # 🌐 Normal downloads
+          ########################################
+          for URL in ${{ steps.extract.outputs.urls }}; do
+            FILENAME=$(basename "$URL")
+            echo "⬇️ Downloading $URL"
+
+            aria2c \
+              --split=4 \
+              --max-connection-per-server=4 \
+              --file-allocation=none \
+              --dir="/tmp/downloads" \
+              --out="$FILENAME" \
+              "$URL"
+          done
+
+          ########################################
+          # 🎬 YouTube 720p downloads
+          ########################################
+          for URL in ${{ steps.extract.outputs.yt_urls }}; do
+            echo "🎬 Downloading YouTube (720p): $URL"
+
+            yt-dlp \
+              -f "bestvideo[height<=720]+bestaudio/best[height<=720]" \
+              --merge-output-format mp4 \
+              -o "/tmp/downloads/%(title).200s.%(ext)s" \
+              "$URL"
+          done
+
+          ########################################
+          # 🎧 YouTube audio
+          ########################################
+          for URL in ${{ steps.extract.outputs.yt_audio_urls }}; do
+            echo "🎧 Downloading YouTube audio: $URL"
+
+            yt-dlp \
+              -f bestaudio \
+              --extract-audio \
+              --audio-format mp3 \
+              -o "/tmp/downloads/%(title).200s.%(ext)s" \
+              "$URL"
+          done
+
+          ########################################
+          # 📦 downloadc: → LFS commit downloads
+          ########################################
+          for URL in ${{ steps.extract.outputs.commit_urls }}; do
+            FILENAME=$(basename "$URL")
+            echo "📦 Downloading for LFS commit: $URL"
+
+            aria2c \
+              --split=4 \
+              --max-connection-per-server=4 \
+              --file-allocation=none \
+              --dir="/tmp/lfs-downloads" \
+              --out="$FILENAME" \
+              "$URL"
+          done
+
+      - name: Commit LFS files to repository
+        if: steps.extract.outputs.commit_urls != ''
+        run: |
+          # Make sure the downloads directory is tracked by LFS
+          mkdir -p downloads
+
+          # Track all files inside downloads/ with LFS (idempotent)
+          git lfs track "downloads/**"
+
+          # Ensure .gitattributes is committed if it changed
+          git add .gitattributes
+
+          # Configure git identity for the commit
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Move downloaded files into the tracked downloads/ folder
+          for FILE in /tmp/lfs-downloads/*; do
+            [ -f "$FILE" ] || continue
+            BASENAME=$(basename "$FILE")
+            echo "📂 Moving $BASENAME → downloads/$BASENAME (LFS)"
+            mv "$FILE" "downloads/$BASENAME"
+            git add "downloads/$BASENAME"
+          done
+
+          # Commit if anything was staged
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: add LFS files via downloadc [skip ci]"
+            git push
+          else
+            echo "⚠️ Nothing staged — skipping LFS commit"
+          fi
+
+      - name: Split large files & prepare release assets
+        run: |
+          mkdir -p downloads
+          LIMIT=$((1900 * 1024 * 1024))
+
+          for FILE in /tmp/downloads/*; do
+            [ -f "$FILE" ] || continue
+
+            SIZE=$(stat -c%s "$FILE")
+            BASENAME=$(basename "$FILE")
+
+            if [ "$SIZE" -gt "$LIMIT" ]; then
+              echo "✂️ Splitting $BASENAME (~1.9GB parts)"
+
+              zip -s 1900m "downloads/${BASENAME}.zip" "$FILE"
+
+              rm -f "$FILE"
+            else
+              mv "$FILE" "downloads/$BASENAME"
+            fi
+          done
+
+          ########################################
+          # Optional zip mode
+          ########################################
+          if [ "${{ steps.extract.outputs.mode }}" = "zip" ]; then
+            FINAL="downloads/archive_$(date +%Y%m%d_%H%M%S).zip"
+            zip -j "$FINAL" downloads/*
+          fi
+
+      - name: Generate release tag
+        id: tag
+        # Only run if there are release assets (skip if only downloadc: was used)
+        if: steps.extract.outputs.urls != '' || steps.extract.outputs.yt_urls != '' || steps.extract.outputs.yt_audio_urls != ''
+        run: |
+          TAG="auto-$(date +%Y%m%d-%H%M%S)"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Create release & upload assets
+        if: steps.tag.outputs.tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "Auto Release ${{ steps.tag.outputs.tag }}"
+          body: ${{ github.event.head_commit.message }}
+          files: downloads/*
