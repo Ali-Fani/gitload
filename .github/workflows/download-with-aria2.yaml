@@ -351,8 +351,10 @@ jobs:
             mkdir -p "$target"
 
             echo "�️  Splitting $name ($((size / 1024 / 1024)) MB) into $target/$stem.zip"
-            ( cd /tmp/file-dl && zip -s 95m -0 -j "$target/$stem.zip" "$name" )
-
+            (
+              cd /tmp/commit-dl || exit 1
+              zip -s 95m -0 "$target/$stem.zip" "$name"
+            )
             total=$(ls -1 "$target"/${stem}.z* "$target"/${stem}.zip 2>/dev/null | wc -l)
 
             size_mb=$((size / 1024 / 1024))
@@ -411,8 +413,10 @@ jobs:
             mkdir -p "$target"
 
             echo "🗜️  Splitting $name ($((size / 1024 / 1024)) MB) into $target/$stem.zip"
-            ( cd /tmp/commit-dl && zip -s 95m -0 -j "$target/$stem.zip" "$name" )
-
+            (
+              cd /tmp/commit-dl || exit 1
+              zip -s 95m -0 "$target/$stem.zip" "$name"
+            )
             total=$(ls -1 "$target"/${stem}.z* "$target"/${stem}.zip 2>/dev/null | wc -l)
 
             size_mb=$((size / 1024 / 1024))
